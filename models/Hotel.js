@@ -1,7 +1,5 @@
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
-
-// Hotel Schema
 const hotelSchema = new Schema({
   name: {
     type: String,
@@ -291,84 +289,61 @@ const hotelSchema = new Schema({
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
-
-// Indexes for better performance
 hotelSchema.index({ 'location.city': 1, 'location.country': 1 });
 hotelSchema.index({ 'rating.overall': -1 });
 hotelSchema.index({ 'pricing.basePrice': 1 });
 hotelSchema.index({ status: 1, featured: -1 });
 hotelSchema.index({ name: 'text', description: 'text' });
-
-// Virtual for bookings
 hotelSchema.virtual('bookings', {
   ref: 'Booking',
   localField: '_id',
   foreignField: 'hotel'
 });
-
-// Virtual for reviews
 hotelSchema.virtual('reviews', {
   ref: 'Review',
   localField: '_id',
   foreignField: 'hotel'
 });
-
-// Virtual for primary image
 hotelSchema.virtual('primaryImage').get(function() {
   const primaryImg = this.images.find(img => img.isPrimary);
   return primaryImg ? primaryImg.url : (this.images[0] ? this.images[0].url : null);
 });
-
-// Virtual for current price (including seasonal rates)
 hotelSchema.virtual('currentPrice').get(function() {
   const now = new Date();
   const seasonalRate = this.pricing.seasonalRates.find(rate => 
     now >= rate.startDate && now <= rate.endDate
   );
-  
   if (seasonalRate) {
     return this.pricing.basePrice * seasonalRate.multiplier;
   }
-  
   return this.pricing.basePrice;
 });
-
-// Virtual for total available rooms
 hotelSchema.virtual('totalAvailableRooms').get(function() {
   return this.roomTypes.reduce((total, roomType) => total + roomType.availableRooms, 0);
 });
-
-// Instance method to check availability
 hotelSchema.methods.checkAvailability = function(checkIn, checkOut, guests = 1) {
-  // This is a simplified version - in reality, you'd check against bookings
   const availableRoomTypes = this.roomTypes.filter(room => 
     room.availableRooms > 0 && 
     room.maxOccupancy >= guests &&
     this.status === 'active'
   );
-  
   return {
     available: availableRoomTypes.length > 0,
     roomTypes: availableRoomTypes,
     totalAvailableRooms: availableRoomTypes.reduce((total, room) => total + room.availableRooms, 0)
   };
 };
-
-// Instance method to calculate total price including taxes
 hotelSchema.methods.calculateTotalPrice = function(nights = 1, roomTypeId = null) {
   let basePrice = this.currentPrice;
-  
   if (roomTypeId) {
     const roomType = this.roomTypes.id(roomTypeId);
     if (roomType) {
       basePrice += roomType.priceAdjustment;
     }
   }
-  
   const subtotal = basePrice * nights;
   const tax = subtotal * this.pricing.taxRate;
   const serviceCharge = this.pricing.serviceCharge;
-  
   return {
     basePrice,
     subtotal,
@@ -377,8 +352,6 @@ hotelSchema.methods.calculateTotalPrice = function(nights = 1, roomTypeId = null
     total: subtotal + tax + serviceCharge
   };
 };
-
-// Static method to find hotels by location
 hotelSchema.statics.findByLocation = function(city, country) {
   return this.find({ 
     'location.city': new RegExp(city, 'i'),
@@ -386,15 +359,11 @@ hotelSchema.statics.findByLocation = function(city, country) {
     status: 'active'
   });
 };
-
-// Static method to find featured hotels
 hotelSchema.statics.findFeatured = function(limit = 10) {
   return this.find({ featured: true, status: 'active' })
     .sort({ 'rating.overall': -1 })
     .limit(limit);
 };
-
-// Pre-save middleware to ensure at least one primary image
 hotelSchema.pre('save', function(next) {
   if (this.images.length > 0) {
     const hasPrimary = this.images.some(img => img.isPrimary);
@@ -402,15 +371,11 @@ hotelSchema.pre('save', function(next) {
       this.images[0].isPrimary = true;
     }
   }
-  
-  // Ensure available rooms don't exceed total rooms
   this.roomTypes.forEach(roomType => {
     if (roomType.availableRooms > roomType.totalRooms) {
       roomType.availableRooms = roomType.totalRooms;
     }
   });
-  
   next();
 });
-
 module.exports = mongoose.model('Hotel', hotelSchema);

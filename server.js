@@ -7,32 +7,26 @@ const winston = require('winston');
 const fs = require('fs');
 const path = require('path');
 
-// Import database configuration
 const { database } = require('./config/database');
 
-// Import routes
 const authRoutes = require('./routes/authRoutes');
 const hotelRoutes = require('./routes/hotelRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const userRoutes = require('./routes/userRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 
-// Import middleware
 const errorHandler = require('./middleware/errorHandler');
 const notFound = require('./middleware/notFound');
-const authMiddleware = require('./middleware/auth');
+const { authMiddleware } = require('./middleware/auth');
 
-// Create Express app
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Create logs directory if it doesn't exist
 const logsDir = path.join(__dirname, 'logs');
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// Configure logger
 const logger = winston.createLogger({
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   format: winston.format.combine(
@@ -54,15 +48,13 @@ const logger = winston.createLogger({
   ]
 });
 
-// Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// Rate limiting
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
   message: {
     error: 'Too many requests from this IP, please try again later.',
     statusCode: 429
@@ -73,7 +65,6 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
-// CORS configuration
 const corsOptions = {
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
@@ -84,17 +75,13 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Request logging middleware
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.originalUrl} - IP: ${req.ip}`);
   next();
 });
 
-// Health check endpoint
 app.get('/health', (req, res) => {
   const healthStatus = {
     status: 'OK',
@@ -108,7 +95,6 @@ app.get('/health', (req, res) => {
   res.status(200).json(healthStatus);
 });
 
-// API documentation endpoint
 app.get('/api', (req, res) => {
   res.json({
     message: 'Welcome to SmartLodge API',
@@ -124,25 +110,19 @@ app.get('/api', (req, res) => {
   });
 });
 
-// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/hotels', hotelRoutes);
 app.use('/api/bookings', authMiddleware, bookingRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
 app.use('/api/payments', authMiddleware, paymentRoutes);
 
-// Serve static files (uploads)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Error handling middleware (must be last)
 app.use(notFound);
 app.use(errorHandler);
 
-// Graceful shutdown handling
 const gracefulShutdown = async (signal) => {
   logger.info(`🛑 Received ${signal}. Starting graceful shutdown...`);
   
-  // Close server
   server.close(async (err) => {
     if (err) {
       logger.error('❌ Error during server shutdown:', err);
@@ -152,7 +132,6 @@ const gracefulShutdown = async (signal) => {
     logger.info('✅ HTTP server closed');
     
     try {
-      // Close database connection
       await database.disconnect();
       logger.info('✅ Database connection closed');
       
@@ -164,29 +143,24 @@ const gracefulShutdown = async (signal) => {
     }
   });
   
-  // Force close after 10 seconds
   setTimeout(() => {
     logger.error('⚠️ Could not close connections in time, forcefully shutting down');
     process.exit(1);
   }, 10000);
 };
 
-// Start server function
 const startServer = async () => {
   try {
-    // Connect to database
-    await database.connect();
+    const dbConnected = await database.connect();
     
-    // Start server
     const server = app.listen(PORT, () => {
       logger.info(`🚀 Server running on port ${PORT}`);
       logger.info(`🌍 Environment: ${process.env.NODE_ENV}`);
-      logger.info(`📊 Database: ${process.env.MONGODB_URI ? 'Connected' : 'Not configured'}`);
+      logger.info(`📊 Database: ${dbConnected ? 'Connected' : 'Disconnected (server still functional)'}`);
       logger.info(`🔗 API URL: http://localhost:${PORT}/api`);
       logger.info(`💚 Health check: http://localhost:${PORT}/health`);
     });
 
-    // Handle graceful shutdown
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
     
@@ -198,8 +172,5 @@ const startServer = async () => {
   }
 };
 
-// Start the server
 const server = startServer();
-
-// Export app for testing
 module.exports = app;

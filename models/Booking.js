@@ -355,11 +355,9 @@ const bookingSchema = new Schema({
   toObject: { virtuals: true }
 });
 
-// Indexes for better performance
-bookingSchema.index({ bookingReference: 1 });
+// Indexes for better performance (avoid duplicates with unique: true and index: true)
 bookingSchema.index({ user: 1, status: 1 });
 bookingSchema.index({ hotel: 1, 'dates.checkIn': 1, 'dates.checkOut': 1 });
-bookingSchema.index({ 'payment.status': 1 });
 bookingSchema.index({ createdAt: -1 });
 
 // Virtual for total guests

@@ -3,18 +3,15 @@ const { authMiddleware, requireAdmin, requireOwnership } = require('../middlewar
 const {
   getUserProfile,
   updateUserProfile,
-  getUserBookings,
-  getUserPreferences,
-  updateUserPreferences,
-  getLoyaltyProgram,
-  addEmergencyContact,
-  updateEmergencyContact,
-  uploadProfileImage,
   deleteUser,
+  getUserBookings,
+  getUserStats,
+  updatePreferences,
+  addLoyaltyPoints,
   getAllUsers,
   getUserById,
   updateUserStatus,
-  getUserStats
+  searchUsers
 } = require('../controllers/userController');
 
 const router = express.Router();
@@ -25,27 +22,16 @@ router.use(authMiddleware);
 // User profile routes
 router.get('/profile', getUserProfile);
 router.put('/profile', updateUserProfile);
+router.delete('/profile', deleteUser);
 router.get('/bookings', getUserBookings);
-router.post('/profile/image', uploadProfileImage);
-
-// User preferences
-router.get('/preferences', getUserPreferences);
-router.put('/preferences', updateUserPreferences);
-
-// Loyalty program
-router.get('/loyalty', getLoyaltyProgram);
-
-// Emergency contact
-router.post('/emergency-contact', addEmergencyContact);
-router.put('/emergency-contact', updateEmergencyContact);
-
-// Account management
-router.delete('/account', deleteUser);
+router.get('/stats', getUserStats);
+router.put('/preferences', updatePreferences);
 
 // Admin routes
 router.get('/', requireAdmin, getAllUsers);
+router.get('/search', requireAdmin, searchUsers);
 router.get('/:id', requireAdmin, getUserById);
-router.patch('/:id/status', requireAdmin, updateUserStatus);
-router.get('/stats/overview', requireAdmin, getUserStats);
+router.put('/:id/status', requireAdmin, updateUserStatus);
+router.post('/:id/loyalty-points', requireAdmin, addLoyaltyPoints);
 
 module.exports = router;

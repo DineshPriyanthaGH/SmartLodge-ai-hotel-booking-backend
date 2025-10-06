@@ -1,12 +1,10 @@
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
-
-// User Schema
 const userSchema = new Schema({
   clerkId: {
     type: String,
     unique: true,
-    sparse: true // Allows null values for guest users
+    sparse: true
   },
   email: {
     type: String,
@@ -14,6 +12,14 @@ const userSchema = new Schema({
     unique: true,
     lowercase: true,
     match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
+  },
+  password: {
+    type: String,
+    required: function() {
+      return !this.clerkId && !this.isGuest;
+    },
+    minLength: [6, 'Password must be at least 6 characters'],
+    select: false
   },
   firstName: {
     type: String,
@@ -36,7 +42,7 @@ const userSchema = new Schema({
     type: Date,
     validate: {
       validator: function(value) {
-        if (!value) return true; // Optional field
+        if (!value) return true;
         return value < new Date();
       },
       message: 'Date of birth must be in the past'
@@ -84,40 +90,32 @@ const userSchema = new Schema({
   isActive: { type: Boolean, default: true },
   isGuest: { type: Boolean, default: false },
   lastLogin: { type: Date },
-  profileImage: { type: String }, // URL to profile image
+  profileImage: { type: String },
   verificationStatus: {
     email: { type: Boolean, default: false },
     phone: { type: Boolean, default: false },
     identity: { type: Boolean, default: false }
-  }
+  },
+  resetPasswordToken: String,
+  resetPasswordExpire: Date,
+  emailVerificationToken: String,
+  emailVerificationExpire: Date
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
-
-// Indexes for better performance
-userSchema.index({ email: 1 });
-userSchema.index({ clerkId: 1 });
 userSchema.index({ 'loyaltyProgram.membershipLevel': 1 });
-
-// Virtual for full name
 userSchema.virtual('fullName').get(function() {
   return `${this.firstName} ${this.lastName}`;
 });
-
-// Virtual for bookings
 userSchema.virtual('bookings', {
   ref: 'Booking',
   localField: '_id',
   foreignField: 'user'
 });
-
-// Instance method to calculate loyalty points
 userSchema.methods.addLoyaltyPoints = function(points) {
   this.loyaltyProgram.points += points;
-  
-  // Update membership level based on points
   if (this.loyaltyProgram.points >= 10000) {
     this.loyaltyProgram.membershipLevel = 'Platinum';
   } else if (this.loyaltyProgram.points >= 5000) {
@@ -125,11 +123,8 @@ userSchema.methods.addLoyaltyPoints = function(points) {
   } else if (this.loyaltyProgram.points >= 1000) {
     this.loyaltyProgram.membershipLevel = 'Silver';
   }
-  
   return this.save();
 };
-
-// Instance method to get discount percentage based on membership
 userSchema.methods.getDiscountPercentage = function() {
   const discounts = {
     Bronze: 0,
@@ -139,29 +134,21 @@ userSchema.methods.getDiscountPercentage = function() {
   };
   return discounts[this.loyaltyProgram.membershipLevel] || 0;
 };
-
-// Static method to find users by membership level
 userSchema.statics.findByMembershipLevel = function(level) {
   return this.find({ 'loyaltyProgram.membershipLevel': level, isActive: true });
 };
-
-// Pre-save middleware to update lastLogin
 userSchema.pre('save', function(next) {
   if (this.isNew) {
     this.lastLogin = new Date();
   }
   next();
 });
-
-// Pre-remove middleware to handle cascading deletes
 userSchema.pre('remove', async function(next) {
   try {
-    // Remove all bookings for this user
     await this.model('Booking').deleteMany({ user: this._id });
     next();
   } catch (error) {
     next(error);
   }
 });
-
 module.exports = mongoose.model('User', userSchema);
