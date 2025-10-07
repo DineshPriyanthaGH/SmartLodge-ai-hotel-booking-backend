@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const winston = require('winston');
 const fs = require('fs');
 const path = require('path');
+const { ClerkExpressWithAuth, ClerkExpressRequireAuth } = require('@clerk/clerk-sdk-node');
 
 const { database } = require('./config/database');
 
@@ -82,10 +83,17 @@ app.use(cors(corsOptions));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Logging middleware
 app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.originalUrl} - IP: ${req.ip}`);
+  logger.info(`${req.method} ${req.originalUrl} - IP: ${req.ip}`, {
+    headers: req.headers.authorization ? 'Has Auth' : 'No Auth'
+  });
   next();
 });
+
+// Handle preflight requests
+app.options('*', cors(corsOptions));
 
 app.get('/health', (req, res) => {
   const healthStatus = {
@@ -161,6 +169,25 @@ app.post('/api/test-sync', async (req, res) => {
       error: error.message
     });
   }
+});
+
+// Test Clerk JWT authentication
+app.get('/api/test-auth', authMiddleware, (req, res) => {
+  res.json({
+    success: true,
+    message: 'Authentication successful',
+    user: {
+      id: req.user._id,
+      email: req.user.email,
+      firstName: req.user.firstName,
+      lastName: req.user.lastName,
+      clerkId: req.user.clerkId
+    },
+    clerkUser: {
+      id: req.clerkUser?.id,
+      email: req.clerkUser?.emailAddresses?.[0]?.emailAddress
+    }
+  });
 });
 
 app.use('/api/webhooks', webhookRoutes);

@@ -1,73 +1,97 @@
 const jwt = require('jsonwebtoken');
-const { clerkClient } = require('@clerk/clerk-sdk-node');
+const { clerkClient, ClerkExpressWithAuth } = require('@clerk/clerk-sdk-node');
 const User = require('../models/User');
 
+// Clerk authentication middleware using session tokens
 const clerkAuth = async (req, res, next) => {
   try {
-    const sessionToken = req.headers.authorization?.replace('Bearer ', '');
-    
-    if (!sessionToken) {
+    // Get the session token from the Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
-        message: 'No session token provided'
+        message: 'No session token provided in Authorization header'
       });
     }
 
-    // Verify the session token with Clerk using the correct method
-    const session = await clerkClient.sessions.verifySession(sessionToken);
+    const sessionToken = authHeader.replace('Bearer ', '');
     
-    if (!session || session.status !== 'active') {
+    // Verify the session token with Clerk
+    try {
+      const session = await clerkClient.sessions.verifySession(sessionToken, {
+        secretKey: process.env.CLERK_SECRET_KEY
+      });
+      
+      if (!session || session.status !== 'active') {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid or inactive session'
+        });
+      }
+
+      // Get user information from Clerk
+      const clerkUser = await clerkClient.users.getUser(session.userId);
+      
+      if (!clerkUser) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not found in Clerk'
+        });
+      }
+
+      // Find or create user in our database
+      let user = await User.findOne({ clerkId: clerkUser.id });
+      
+      if (!user) {
+        // Create new user if doesn't exist
+        console.log('Creating new user in database for Clerk user:', clerkUser.id);
+        user = new User({
+          clerkId: clerkUser.id,
+          email: clerkUser.emailAddresses[0]?.emailAddress || '',
+          firstName: clerkUser.firstName || '',
+          lastName: clerkUser.lastName || '',
+          profileImage: clerkUser.imageUrl || '',
+          isActive: true,
+          verificationStatus: {
+            email: true, // Email verified through Clerk
+            phone: false,
+            identity: false
+          },
+          role: clerkUser.publicMetadata?.role || 'user',
+          lastLogin: new Date()
+        });
+        await user.save();
+        console.log('User created in database:', user.email);
+      } else {
+        // Update existing user's last login and sync data
+        user.email = clerkUser.emailAddresses[0]?.emailAddress || user.email;
+        user.firstName = clerkUser.firstName || user.firstName;
+        user.lastName = clerkUser.lastName || user.lastName;
+        user.profileImage = clerkUser.imageUrl || user.profileImage;
+        user.lastLogin = new Date();
+        await user.save();
+      }
+
+      // Attach user info to request
+      req.user = user;
+      req.userId = user._id;
+      req.clerkUser = clerkUser;
+      req.auth = { 
+        userId: clerkUser.id, 
+        user: clerkUser,
+        session: session
+      };
+      
+      next();
+    } catch (clerkError) {
+      console.error('Clerk session verification error:', clerkError);
       return res.status(401).json({
         success: false,
-        message: 'Invalid or inactive session'
+        message: 'Invalid session token',
+        error: clerkError.message
       });
     }
-
-    // Get user information from Clerk
-    const clerkUser = await clerkClient.users.getUser(session.userId);
     
-    if (!clerkUser) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not found in Clerk'
-      });
-    }
-
-    // Find or create user in our database
-    let user = await User.findOne({ clerkId: clerkUser.id });
-    
-    if (!user) {
-      // Create new user if doesn't exist
-      console.log('Creating new user in database for Clerk user:', clerkUser.id);
-      user = new User({
-        clerkId: clerkUser.id,
-        email: clerkUser.emailAddresses[0]?.emailAddress || '',
-        firstName: clerkUser.firstName || '',
-        lastName: clerkUser.lastName || '',
-        profileImage: clerkUser.imageUrl || '',
-        isActive: true,
-        verificationStatus: {
-          email: true, // Email verified through Clerk
-          phone: false,
-          identity: false
-        },
-        role: clerkUser.publicMetadata?.role || 'user',
-        lastLogin: new Date()
-      });
-      await user.save();
-      console.log('User created in database:', user.email);
-    } else {
-      // Update existing user's last login
-      user.lastLogin = new Date();
-      await user.save();
-    }
-
-    // Attach user info to request
-    req.user = user;
-    req.userId = user._id;
-    req.clerkUser = clerkUser;
-    
-    next();
   } catch (error) {
     console.error('Clerk authentication error:', error);
     return res.status(401).json({
@@ -124,13 +148,49 @@ const jwtAuth = async (req, res, next) => {
     });
   }
 };
+// Clerk Express middleware wrapper
+const clerkExpressAuth = ClerkExpressWithAuth({
+  // Optional: Custom error handler
+  onError: (error) => {
+    console.error('Clerk Express Auth Error:', error);
+  }
+});
+
+// Combined authentication middleware
 const authMiddleware = async (req, res, next) => {
-  // Check if Clerk is enabled by checking for Clerk secret key
+  // Check if Clerk is properly configured
   if (process.env.CLERK_SECRET_KEY && process.env.CLERK_SECRET_KEY !== 'sk_test_your_clerk_secret_key') {
+    // Use Clerk JWT authentication
     return clerkAuth(req, res, next);
   } else {
-    // Fallback to JWT auth for backward compatibility
+    // Fallback to custom JWT auth for backward compatibility
+    console.warn('Clerk not properly configured, falling back to JWT auth');
     return jwtAuth(req, res, next);
+  }
+};
+
+// Clerk middleware for routes that require authentication
+const requireAuth = async (req, res, next) => {
+  try {
+    // First apply Clerk Express middleware
+    clerkExpressAuth(req, res, (err) => {
+      if (err) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authentication required',
+          error: err.message
+        });
+      }
+      
+      // Then apply our custom auth logic
+      authMiddleware(req, res, next);
+    });
+  } catch (error) {
+    console.error('RequireAuth middleware error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Authentication error'
+    });
   }
 };
 const optionalAuth = async (req, res, next) => {
@@ -301,7 +361,9 @@ const validateRequest = (schema) => {
 };
 module.exports = {
   authMiddleware,
+  requireAuth,
   clerkAuth,
+  clerkExpressAuth,
   jwtAuth,
   optionalAuth,
   requireAdmin,
