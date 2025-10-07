@@ -19,8 +19,7 @@ const getAllHotels = async (req, res, next) => {
     const hotels = await Hotel.find({ status })
       .sort(sort)
       .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .populate('reviews', 'rating comment user createdAt');
+      .skip((page - 1) * limit);
     const total = await Hotel.countDocuments({ status });
     res.status(200).json({
       success: true,
@@ -39,9 +38,7 @@ const getAllHotels = async (req, res, next) => {
 };
 const getHotelById = async (req, res, next) => {
   try {
-    const hotel = await Hotel.findById(req.params.id)
-      .populate('reviews', 'rating comment user createdAt')
-      .populate('bookings', 'dates status user');
+    const hotel = await Hotel.findById(req.params.id);
     if (!hotel) {
       return res.status(404).json({
         success: false,
@@ -208,19 +205,10 @@ const getHotelRoomTypes = async (req, res, next) => {
 const getHotelReviews = async (req, res, next) => {
   try {
     const { page = 1, limit = 10 } = req.query;
-    const hotel = await Hotel.findById(req.params.id)
-      .populate({
-        path: 'reviews',
-        options: {
-          sort: { createdAt: -1 },
-          limit: limit * 1,
-          skip: (page - 1) * limit
-        },
-        populate: {
-          path: 'user',
-          select: 'firstName lastName profileImage'
-        }
-      });
+    const hotel = await Hotel.findById(req.params.id);
+    
+    // Temporary: Return empty reviews array until Review model is properly integrated
+    const reviews = [];
     if (!hotel) {
       return res.status(404).json({
         success: false,
@@ -230,7 +218,7 @@ const getHotelReviews = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: { 
-        reviews: hotel.reviews,
+        reviews: reviews,
         rating: hotel.rating
       }
     });

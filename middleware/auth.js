@@ -13,15 +13,13 @@ const clerkAuth = async (req, res, next) => {
       });
     }
 
-    // Verify the session token with Clerk
-    const session = await clerkClient.sessions.verifySession(sessionToken, {
-      secretKey: process.env.CLERK_SECRET_KEY
-    });
+    // Verify the session token with Clerk using the correct method
+    const session = await clerkClient.sessions.verifySession(sessionToken);
     
-    if (!session) {
+    if (!session || session.status !== 'active') {
       return res.status(401).json({
         success: false,
-        message: 'Invalid session token'
+        message: 'Invalid or inactive session'
       });
     }
 
@@ -31,7 +29,7 @@ const clerkAuth = async (req, res, next) => {
     if (!clerkUser) {
       return res.status(401).json({
         success: false,
-        message: 'User not found'
+        message: 'User not found in Clerk'
       });
     }
 
@@ -40,6 +38,7 @@ const clerkAuth = async (req, res, next) => {
     
     if (!user) {
       // Create new user if doesn't exist
+      console.log('Creating new user in database for Clerk user:', clerkUser.id);
       user = new User({
         clerkId: clerkUser.id,
         email: clerkUser.emailAddresses[0]?.emailAddress || '',
@@ -47,8 +46,19 @@ const clerkAuth = async (req, res, next) => {
         lastName: clerkUser.lastName || '',
         profileImage: clerkUser.imageUrl || '',
         isActive: true,
-        role: clerkUser.publicMetadata?.role || 'user'
+        verificationStatus: {
+          email: true, // Email verified through Clerk
+          phone: false,
+          identity: false
+        },
+        role: clerkUser.publicMetadata?.role || 'user',
+        lastLogin: new Date()
       });
+      await user.save();
+      console.log('User created in database:', user.email);
+    } else {
+      // Update existing user's last login
+      user.lastLogin = new Date();
       await user.save();
     }
 

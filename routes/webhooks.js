@@ -3,6 +3,98 @@ const { Webhook } = require('svix');
 const User = require('../models/User');
 const router = express.Router();
 
+// Sync Clerk user with our database - UPDATED VERSION
+router.post('/sync-clerk-user', async (req, res) => {
+  try {
+    console.log('=== WEBHOOK SYNC REQUEST ===');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    console.log('Headers:', req.headers);
+    
+    const { clerkId, email, firstName, lastName, imageUrl } = req.body;
+
+    if (!clerkId || !email) {
+      console.error('Missing required user data:', { clerkId, email });
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required user data (clerkId and email are required)',
+        received: { clerkId: !!clerkId, email: !!email, firstName, lastName }
+      });
+    }
+
+    console.log('Looking for existing user with clerkId:', clerkId);
+    
+    // Check if user already exists
+    let user = await User.findOne({ clerkId });
+    console.log('Existing user found:', !!user);
+
+    if (user) {
+      // Update existing user
+      console.log('Updating existing user:', user.email);
+      user.email = email;
+      user.firstName = firstName || user.firstName;
+      user.lastName = lastName || user.lastName;
+      user.profileImage = imageUrl || user.profileImage;
+      user.lastLogin = new Date();
+      user.verificationStatus.email = true; // Email is verified if coming from Clerk
+      await user.save();
+      console.log('User updated successfully');
+    } else {
+      // Create new user
+      console.log('Creating new user for email:', email);
+      user = new User({
+        clerkId,
+        email,
+        firstName: firstName || '',
+        lastName: lastName || '',
+        profileImage: imageUrl || '',
+        isActive: true,
+        lastLogin: new Date(),
+        verificationStatus: {
+          email: true, // Email is verified if coming from Clerk
+          phone: false,
+          identity: false
+        },
+        role: 'user'
+      });
+      
+      const savedUser = await user.save();
+      console.log('New user created successfully with ID:', savedUser._id);
+    }
+
+    const responseData = {
+      success: true,
+      message: 'User synchronized successfully',
+      user: {
+        id: user._id,
+        clerkId: user.clerkId,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        profileImage: user.profileImage,
+        verificationStatus: user.verificationStatus,
+        createdAt: user.createdAt,
+        lastLogin: user.lastLogin
+      }
+    };
+
+    console.log('Sending success response:', JSON.stringify(responseData, null, 2));
+    res.status(200).json(responseData);
+
+  } catch (error) {
+    console.error('=== USER SYNC ERROR ===');
+    console.error('Error details:', error);
+    console.error('Error stack:', error.stack);
+    
+    res.status(500).json({
+      success: false,
+      message: 'Failed to sync user',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Clerk webhook endpoint
 router.post('/clerk', express.raw({ type: 'application/json' }), async (req, res) => {
   try {

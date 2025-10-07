@@ -67,7 +67,11 @@ const limiter = rateLimit({
 app.use(limiter);
 
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    process.env.FRONTEND_URL
+  ].filter(Boolean),
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -109,6 +113,54 @@ app.get('/api', (req, res) => {
       payments: '/api/payments'
     }
   });
+});
+
+// Direct test route (bypass all middleware)
+app.post('/api/test-sync', async (req, res) => {
+  try {
+    console.log('Direct sync test received:', req.body);
+    const { clerkId, email, firstName, lastName } = req.body;
+    
+    if (!clerkId || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required data'
+      });
+    }
+
+    const User = require('./models/User');
+    let user = await User.findOne({ clerkId });
+    
+    if (!user) {
+      user = new User({
+        clerkId,
+        email,
+        firstName: firstName || '',
+        lastName: lastName || '',
+        isActive: true,
+        verificationStatus: {
+          email: true,
+          phone: false,
+          identity: false
+        },
+        role: 'user'
+      });
+      await user.save();
+      console.log('User created:', user._id);
+    }
+
+    res.json({
+      success: true,
+      message: 'User synced successfully',
+      user: { id: user._id, email: user.email }
+    });
+  } catch (error) {
+    console.error('Sync error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 app.use('/api/webhooks', webhookRoutes);
