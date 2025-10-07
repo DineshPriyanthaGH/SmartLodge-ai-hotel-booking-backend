@@ -1,7 +1,71 @@
 const jwt = require('jsonwebtoken');
+const { clerkClient } = require('@clerk/clerk-sdk-node');
 const User = require('../models/User');
-const clerkAuth = (req, res, next) => {
-  next();
+
+const clerkAuth = async (req, res, next) => {
+  try {
+    const sessionToken = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!sessionToken) {
+      return res.status(401).json({
+        success: false,
+        message: 'No session token provided'
+      });
+    }
+
+    // Verify the session token with Clerk
+    const session = await clerkClient.sessions.verifySession(sessionToken, {
+      secretKey: process.env.CLERK_SECRET_KEY
+    });
+    
+    if (!session) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid session token'
+      });
+    }
+
+    // Get user information from Clerk
+    const clerkUser = await clerkClient.users.getUser(session.userId);
+    
+    if (!clerkUser) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Find or create user in our database
+    let user = await User.findOne({ clerkId: clerkUser.id });
+    
+    if (!user) {
+      // Create new user if doesn't exist
+      user = new User({
+        clerkId: clerkUser.id,
+        email: clerkUser.emailAddresses[0]?.emailAddress || '',
+        firstName: clerkUser.firstName || '',
+        lastName: clerkUser.lastName || '',
+        profileImage: clerkUser.imageUrl || '',
+        isActive: true,
+        role: clerkUser.publicMetadata?.role || 'user'
+      });
+      await user.save();
+    }
+
+    // Attach user info to request
+    req.user = user;
+    req.userId = user._id;
+    req.clerkUser = clerkUser;
+    
+    next();
+  } catch (error) {
+    console.error('Clerk authentication error:', error);
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication failed',
+      error: error.message
+    });
+  }
 };
 const jwtAuth = async (req, res, next) => {
   try {
@@ -51,7 +115,13 @@ const jwtAuth = async (req, res, next) => {
   }
 };
 const authMiddleware = async (req, res, next) => {
-  return jwtAuth(req, res, next);
+  // Check if Clerk is enabled by checking for Clerk secret key
+  if (process.env.CLERK_SECRET_KEY && process.env.CLERK_SECRET_KEY !== 'sk_test_your_clerk_secret_key') {
+    return clerkAuth(req, res, next);
+  } else {
+    // Fallback to JWT auth for backward compatibility
+    return jwtAuth(req, res, next);
+  }
 };
 const optionalAuth = async (req, res, next) => {
   try {

@@ -14,6 +14,7 @@ const hotelRoutes = require('./routes/hotelRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const userRoutes = require('./routes/userRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const webhookRoutes = require('./routes/webhooks');
 
 const errorHandler = require('./middleware/errorHandler');
 const notFound = require('./middleware/notFound');
@@ -110,6 +111,7 @@ app.get('/api', (req, res) => {
   });
 });
 
+app.use('/api/webhooks', webhookRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/hotels', hotelRoutes);
 app.use('/api/bookings', authMiddleware, bookingRoutes);
@@ -121,30 +123,30 @@ app.use(notFound);
 app.use(errorHandler);
 
 const gracefulShutdown = async (signal) => {
-  logger.info(`🛑 Received ${signal}. Starting graceful shutdown...`);
+  logger.info(` Received ${signal}. Starting graceful shutdown...`);
   
   server.close(async (err) => {
     if (err) {
-      logger.error('❌ Error during server shutdown:', err);
+      logger.error(' Error during server shutdown:', err);
       return process.exit(1);
     }
     
-    logger.info('✅ HTTP server closed');
+    logger.info(' HTTP server closed');
     
     try {
       await database.disconnect();
-      logger.info('✅ Database connection closed');
+      logger.info(' Database connection closed');
       
-      logger.info('✅ Graceful shutdown completed');
+      logger.info(' Graceful shutdown completed');
       process.exit(0);
     } catch (error) {
-      logger.error('❌ Error during database shutdown:', error);
+      logger.error('Error during database shutdown:', error);
       process.exit(1);
     }
   });
   
   setTimeout(() => {
-    logger.error('⚠️ Could not close connections in time, forcefully shutting down');
+    logger.error(' Could not close connections in time, forcefully shutting down');
     process.exit(1);
   }, 10000);
 };
@@ -154,11 +156,11 @@ const startServer = async () => {
     const dbConnected = await database.connect();
     
     const server = app.listen(PORT, () => {
-      logger.info(`🚀 Server running on port ${PORT}`);
-      logger.info(`🌍 Environment: ${process.env.NODE_ENV}`);
-      logger.info(`📊 Database: ${dbConnected ? 'Connected' : 'Disconnected (server still functional)'}`);
-      logger.info(`🔗 API URL: http://localhost:${PORT}/api`);
-      logger.info(`💚 Health check: http://localhost:${PORT}/health`);
+      logger.info(` Server running on port ${PORT}`);
+      logger.info(` Environment: ${process.env.NODE_ENV}`);
+      logger.info(` Database: ${dbConnected ? 'Connected' : 'Disconnected (server still functional)'}`);
+      logger.info(` API URL: http://localhost:${PORT}/api`);
+      logger.info(` Health check: http://localhost:${PORT}/health`);
     });
 
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
@@ -167,7 +169,7 @@ const startServer = async () => {
     return server;
     
   } catch (error) {
-    logger.error('❌ Failed to start server:', error);
+    logger.error(' Failed to start server:', error);
     process.exit(1);
   }
 };

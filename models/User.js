@@ -87,6 +87,11 @@ const userSchema = new Schema({
       match: [/^\+?[\d\s-()]+$/, 'Please enter a valid emergency contact phone number']
     }
   },
+  role: {
+    type: String,
+    enum: ['user', 'admin', 'staff'],
+    default: 'user'
+  },
   isActive: { type: Boolean, default: true },
   isGuest: { type: Boolean, default: false },
   lastLogin: { type: Date },
