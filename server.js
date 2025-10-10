@@ -87,7 +87,13 @@ const corsOptions = {
     }
     
     // For development, allow all localhost origins
-    if (process.env.NODE_ENV === 'development' && origin.includes('localhost')) {
+    if (process.env.NODE_ENV === 'development' && origin && origin.includes('localhost')) {
+      return callback(null, true);
+    }
+    
+    // For production, allow Vercel domains
+    if (process.env.NODE_ENV === 'production' && origin && 
+        (origin.includes('.vercel.app') || origin.includes('.vercel.com'))) {
       return callback(null, true);
     }
     
