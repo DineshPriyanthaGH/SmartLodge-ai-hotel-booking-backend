@@ -307,21 +307,37 @@ hotelSchema.index({ name: 'text', description: 'text' });
 //   foreignField: 'hotel'
 // });
 hotelSchema.virtual('primaryImage').get(function() {
-  const primaryImg = this.images.find(img => img.isPrimary);
+  if (!this.images || !Array.isArray(this.images) || this.images.length === 0) {
+    return null;
+  }
+  
+  const primaryImg = this.images.find(img => img && img.isPrimary);
   return primaryImg ? primaryImg.url : (this.images[0] ? this.images[0].url : null);
 });
 hotelSchema.virtual('currentPrice').get(function() {
+  // Check if pricing exists and has required properties
+  if (!this.pricing || !this.pricing.seasonalRates || !this.pricing.basePrice) {
+    return this.pricing?.basePrice || 0;
+  }
+
   const now = new Date();
   const seasonalRate = this.pricing.seasonalRates.find(rate => 
+    rate && rate.startDate && rate.endDate &&
     now >= rate.startDate && now <= rate.endDate
   );
-  if (seasonalRate) {
+  
+  if (seasonalRate && seasonalRate.multiplier) {
     return this.pricing.basePrice * seasonalRate.multiplier;
   }
   return this.pricing.basePrice;
 });
 hotelSchema.virtual('totalAvailableRooms').get(function() {
-  return this.roomTypes.reduce((total, roomType) => total + roomType.availableRooms, 0);
+  if (!this.roomTypes || !Array.isArray(this.roomTypes)) {
+    return 0;
+  }
+  return this.roomTypes.reduce((total, roomType) => {
+    return total + (roomType && roomType.availableRooms ? roomType.availableRooms : 0);
+  }, 0);
 });
 hotelSchema.methods.checkAvailability = function(checkIn, checkOut, guests = 1) {
   const availableRoomTypes = this.roomTypes.filter(room => 

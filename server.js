@@ -15,6 +15,7 @@ const hotelRoutes = require('./routes/hotelRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const userRoutes = require('./routes/userRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
 const webhookRoutes = require('./routes/webhooks');
 
 const errorHandler = require('./middleware/errorHandler');
@@ -68,15 +69,36 @@ const limiter = rateLimit({
 app.use(limiter);
 
 const corsOptions = {
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    process.env.FRONTEND_URL
-  ].filter(Boolean),
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
+    
+    console.log('CORS request from origin:', origin);
+    
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // For development, allow all localhost origins
+    if (process.env.NODE_ENV === 'development' && origin.includes('localhost')) {
+      return callback(null, true);
+    }
+    
+    const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+    return callback(new Error(msg), false);
+  },
   credentials: true,
   optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range']
 };
 
 app.use(cors(corsOptions));
@@ -88,6 +110,17 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.originalUrl} - IP: ${req.ip}`, {
     headers: req.headers.authorization ? 'Has Auth' : 'No Auth'
+  });
+  next();
+});
+
+// Debug middleware for CORS
+app.use((req, res, next) => {
+  console.log(`🌐 ${req.method} ${req.originalUrl} - Origin: ${req.headers.origin}`);
+  console.log('Headers:', {
+    origin: req.headers.origin,
+    authorization: req.headers.authorization ? 'Present' : 'Missing',
+    'content-type': req.headers['content-type']
   });
   next();
 });
@@ -108,6 +141,16 @@ app.get('/health', (req, res) => {
   res.status(200).json(healthStatus);
 });
 
+// Test endpoint for CORS verification
+app.get('/api/test-cors', (req, res) => {
+  res.json({
+    success: true,
+    message: 'CORS is working!',
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.get('/api', (req, res) => {
   res.json({
     message: 'Welcome to SmartLodge API',
@@ -118,7 +161,8 @@ app.get('/api', (req, res) => {
       hotels: '/api/hotels',
       bookings: '/api/bookings',
       users: '/api/users',
-      payments: '/api/payments'
+      payments: '/api/payments',
+      reviews: '/api/reviews'
     }
   });
 });
@@ -196,6 +240,7 @@ app.use('/api/hotels', hotelRoutes);
 app.use('/api/bookings', authMiddleware, bookingRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
 app.use('/api/payments', authMiddleware, paymentRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(notFound);

@@ -1,51 +1,21 @@
 const jwt = require('jsonwebtoken');
 const { clerkClient } = require('@clerk/clerk-sdk-node');
+const { ClerkExpressRequireAuth, ClerkExpressWithAuth } = require('@clerk/express');
 const User = require('../models/User');
 
-// Simple Clerk authentication middleware that works with older versions
-const clerkAuth = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authorization token required'
-      });
-    }
-
-    const token = authHeader.split(' ')[1];
-    
-    // Verify the token with Clerk
-    const decoded = await clerkClient.verifyToken(token);
-    
-    if (!decoded || !decoded.sub) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token'
-      });
-    }
-
-    // Store Clerk user ID for use in next middleware
-    req.clerkUserId = decoded.sub;
-    req.auth = { userId: decoded.sub };
-    
-    next();
-  } catch (error) {
-    console.error('Clerk token verification error:', error);
-    return res.status(401).json({
-      success: false,
-      message: 'Token verification failed',
-      error: error.message
-    });
+// Modern Clerk authentication using @clerk/express middleware
+const clerkAuth = ClerkExpressRequireAuth({
+  // Custom error handler
+  onError: (error) => {
+    console.error('Clerk Express Auth Error:', error);
   }
-};
+});
 
 // Custom middleware to sync Clerk user with our database
 const syncClerkUser = async (req, res, next) => {
   try {
-    // Get Clerk user ID from the previous middleware
-    const clerkUserId = req.clerkUserId;
-    if (!clerkUserId) {
+    // Check if user is authenticated via Clerk
+    if (!req.auth || !req.auth.userId) {
       return res.status(401).json({
         success: false,
         message: 'Authentication required'
@@ -53,7 +23,7 @@ const syncClerkUser = async (req, res, next) => {
     }
 
     // Get user information from Clerk
-    const clerkUser = await clerkClient.users.getUser(clerkUserId);
+    const clerkUser = await clerkClient.users.getUser(req.auth.userId);
     
     if (!clerkUser) {
       return res.status(401).json({
@@ -167,12 +137,12 @@ const jwtAuth = async (req, res, next) => {
   }
 };
 
-// Optional authentication middleware - since clerkMiddleware is global, just pass through
-const optionalAuth = (req, res, next) => {
-  // The auth context is already available from global clerkMiddleware
-  // Just continue to the next middleware
-  next();
-};
+// Optional authentication middleware
+const optionalAuth = ClerkExpressWithAuth({
+  onError: (error) => {
+    console.log('Optional auth failed, continuing without authentication:', error.message);
+  }
+});
 
 // Authorization middlewares
 const requireAdmin = (req, res, next) => {
@@ -341,7 +311,6 @@ const validateRequest = (schema) => {
 
 module.exports = {
   authMiddleware,
-  requireAuth: authMiddleware, // Alias for backward compatibility
   clerkAuth,
   syncClerkUser,
   jwtAuth,
