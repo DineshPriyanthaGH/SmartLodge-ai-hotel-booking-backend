@@ -77,26 +77,32 @@ const corsOptions = {
       'http://localhost:3000',
       'http://localhost:5173',
       'http://127.0.0.1:5173',
+      'https://smart-lodge-ai-hotel-booking-fronte.vercel.app',
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
     console.log('CORS request from origin:', origin);
+    console.log('Allowed origins:', allowedOrigins);
     
     if (allowedOrigins.includes(origin)) {
+      console.log('✅ CORS: Origin allowed');
       return callback(null, true);
     }
     
     // For development, allow all localhost origins
     if (process.env.NODE_ENV === 'development' && origin && origin.includes('localhost')) {
+      console.log('✅ CORS: Development localhost allowed');
       return callback(null, true);
     }
     
     // For production, allow Vercel domains
     if (process.env.NODE_ENV === 'production' && origin && 
         (origin.includes('.vercel.app') || origin.includes('.vercel.com'))) {
+      console.log('✅ CORS: Vercel domain allowed');
       return callback(null, true);
     }
     
+    console.log('❌ CORS: Origin blocked');
     const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
     return callback(new Error(msg), false);
   },
@@ -283,14 +289,25 @@ const gracefulShutdown = async (signal) => {
 
 const startServer = async () => {
   try {
-    const dbConnected = await database.connect();
+    // Try to connect to database, but don't fail if it's not available
+    let dbConnected = false;
+    try {
+      dbConnected = await database.connect();
+    } catch (dbError) {
+      logger.warn('Database connection failed, but server will continue running');
+      logger.warn('Database error:', dbError.message);
+    }
     
     const server = app.listen(PORT, () => {
-      logger.info(` Server running on port ${PORT}`);
-      logger.info(` Environment: ${process.env.NODE_ENV}`);
-      logger.info(` Database: ${dbConnected ? 'Connected' : 'Disconnected (server still functional)'}`);
-      logger.info(` API URL: http://localhost:${PORT}/api`);
-      logger.info(` Health check: http://localhost:${PORT}/health`);
+      logger.info(`🚀 Server running on port ${PORT}`);
+      logger.info(`🌍 Environment: ${process.env.NODE_ENV}`);
+      logger.info(`💾 Database: ${dbConnected ? '✅ Connected' : '❌ Disconnected (server still functional)'}`);
+      logger.info(`🔗 API URL: http://localhost:${PORT}/api`);
+      logger.info(`❤️ Health check: http://localhost:${PORT}/health`);
+      
+      // Log environment variables for debugging
+      logger.info(`🎯 Frontend URL: ${process.env.FRONTEND_URL}`);
+      logger.info(`🔑 MongoDB URI: ${process.env.MONGODB_URI ? 'Set' : 'Missing'}`);
     });
 
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
@@ -299,7 +316,7 @@ const startServer = async () => {
     return server;
     
   } catch (error) {
-    logger.error(' Failed to start server:', error);
+    logger.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 };

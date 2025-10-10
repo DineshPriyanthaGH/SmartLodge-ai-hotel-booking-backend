@@ -10,17 +10,37 @@ const logger = winston.createLogger({
 });
 const getAllHotels = async (req, res, next) => {
   try {
+    console.log('🏨 getAllHotels called');
+    
+    // Check if database is connected
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState !== 1) {
+      console.error('❌ Database not connected');
+      return res.status(503).json({
+        success: false,
+        message: 'Database connection unavailable. Please try again later.',
+        error: 'SERVICE_UNAVAILABLE'
+      });
+    }
+
     const {
       page = 1,
       limit = 10,
       sort = '-rating.overall',
       status = 'active'
     } = req.query;
+    
+    console.log('📊 Query params:', { page, limit, sort, status });
+    
     const hotels = await Hotel.find({ status })
       .sort(sort)
       .limit(limit * 1)
       .skip((page - 1) * limit);
+      
     const total = await Hotel.countDocuments({ status });
+    
+    console.log(`✅ Found ${hotels.length} hotels out of ${total} total`);
+    
     res.status(200).json({
       success: true,
       data: {
@@ -33,6 +53,8 @@ const getAllHotels = async (req, res, next) => {
       }
     });
   } catch (error) {
+    console.error('❌ getAllHotels error:', error);
+    logger.error('getAllHotels error:', error);
     next(error);
   }
 };
