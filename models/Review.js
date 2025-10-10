@@ -17,7 +17,7 @@ const reviewSchema = new Schema({
   booking: {
     type: Schema.Types.ObjectId,
     ref: 'Booking',
-    required: true,
+    required: false,
     index: true
   },
   rating: {

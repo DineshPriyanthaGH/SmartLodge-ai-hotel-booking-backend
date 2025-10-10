@@ -17,8 +17,11 @@ const logger = winston.createLogger({
 // Create a new review
 const createReview = async (req, res, next) => {
   try {
+    console.log('createReview - Request body:', req.body);
+    console.log('createReview - User ID:', req.userId);
+    
     const {
-      hotelId,
+      hotel: hotelId,  // Accept 'hotel' from frontend but use as hotelId internally
       bookingId,
       rating,
       title,
