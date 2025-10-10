@@ -70,8 +70,21 @@ app.use(limiter);
 
 const corsOptions = {
   origin: function (origin, callback) {
+    console.log('🌐 CORS check for origin:', origin);
+    
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('✅ No origin - allowing');
+      return callback(null, true);
+    }
+    
+    // In production, be more permissive for Vercel domains
+    if (process.env.NODE_ENV === 'production') {
+      if (origin.includes('.vercel.app') || origin.includes('.vercel.com')) {
+        console.log('✅ Vercel domain allowed:', origin);
+        return callback(null, true);
+      }
+    }
     
     const allowedOrigins = [
       'http://localhost:3000',
@@ -81,28 +94,26 @@ const corsOptions = {
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
-    console.log('CORS request from origin:', origin);
-    console.log('Allowed origins:', allowedOrigins);
+    console.log('🎯 Allowed origins:', allowedOrigins);
     
     if (allowedOrigins.includes(origin)) {
-      console.log('✅ CORS: Origin allowed');
+      console.log('✅ Origin explicitly allowed:', origin);
       return callback(null, true);
     }
     
     // For development, allow all localhost origins
     if (process.env.NODE_ENV === 'development' && origin && origin.includes('localhost')) {
-      console.log('✅ CORS: Development localhost allowed');
+      console.log('✅ Development localhost allowed:', origin);
       return callback(null, true);
     }
     
-    // For production, allow Vercel domains
-    if (process.env.NODE_ENV === 'production' && origin && 
-        (origin.includes('.vercel.app') || origin.includes('.vercel.com'))) {
-      console.log('✅ CORS: Vercel domain allowed');
+    console.log('❌ CORS: Origin blocked:', origin);
+    // For debugging - temporarily allow all origins in production
+    if (process.env.NODE_ENV === 'production') {
+      console.log('🔓 Production: Temporarily allowing all origins for debugging');
       return callback(null, true);
     }
     
-    console.log('❌ CORS: Origin blocked');
     const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
     return callback(new Error(msg), false);
   },
