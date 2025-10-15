@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # MongoDB Service (for local development)
+  # MongoDB Service 
   mongodb:
     image: mongo:7.0
     container_name: smartlodge-mongodb
@@ -18,7 +18,7 @@ services:
     networks:
       - smartlodge-network
 
-  # Redis Service (for caching)
+  # Redis Service
   redis:
     image: redis:7-alpine
     container_name: smartlodge-redis
