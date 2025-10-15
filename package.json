@@ -8,7 +8,14 @@
     "dev": "nodemon server.js",
     "test": "jest",
     "lint": "eslint .",
-    "seed": "node scripts/seedData.js"
+    "seed": "node scripts/seedData.js",
+    "docker:build": "docker build -t smartlodge-backend:latest .",
+    "docker:dev": "docker-compose up -d",
+    "docker:dev:stop": "docker-compose down",
+    "docker:prod": "docker-compose -f docker-compose.prod.yml up -d",
+    "docker:prod:stop": "docker-compose -f docker-compose.prod.yml down",
+    "docker:logs": "docker-compose logs -f app",
+    "docker:clean": "docker-compose down -v && docker system prune -f"
   },
   "keywords": [
     "hotel",
