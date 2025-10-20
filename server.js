@@ -107,10 +107,10 @@ const corsOptions = {
       return callback(null, true);
     }
     
-    console.log('❌ CORS: Origin blocked:', origin);
+    console.log('CORS: Origin blocked:', origin);
     // For debugging - temporarily allow all origins in production
     if (process.env.NODE_ENV === 'production') {
-      console.log('🔓 Production: Temporarily allowing all origins for debugging');
+      console.log(' allowing all origins for debugging');
       return callback(null, true);
     }
     
