@@ -70,11 +70,11 @@ app.use(limiter);
 
 const corsOptions = {
   origin: function (origin, callback) {
-    console.log('🌐 CORS check for origin:', origin);
+    console.log(' CORS check for origin:', origin);
     
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) {
-      console.log('✅ No origin - allowing');
+      console.log(' No origin - allowing');
       return callback(null, true);
     }
     
