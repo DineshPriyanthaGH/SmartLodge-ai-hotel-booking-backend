@@ -72,16 +72,16 @@ const corsOptions = {
   origin: function (origin, callback) {
     console.log(' CORS check for origin:', origin);
     
-    // Allow requests with no origin (like mobile apps or curl requests)
+    
     if (!origin) {
       console.log(' No origin - allowing');
       return callback(null, true);
     }
     
-    // In production, be more permissive for Vercel domains
+   
     if (process.env.NODE_ENV === 'production') {
       if (origin.includes('.vercel.app') || origin.includes('.vercel.com')) {
-        console.log('✅ Vercel domain allowed:', origin);
+        console.log(' Vercel domain allowed:', origin);
         return callback(null, true);
       }
     }
