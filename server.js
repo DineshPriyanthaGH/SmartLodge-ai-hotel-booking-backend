@@ -16,10 +16,14 @@ console.log('Port:', PORT);
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
+  process.env.FRONTEND_URL,
   'https://smart-lodge-ai-hotel-booking-fronte.vercel.app',
   'https://ai-hotel-booking-frontend.vercel.app',
-  'https://smartlodge-ai-hotel-booking.vercel.app'
-];
+  'https://smartlodge-ai-hotel-booking.vercel.app',
+  'https://smart-lodge-ai-hotel-booking.vercel.app',
+  'https://smartlodge-ai-hotel-booking-frontend.vercel.app',
+  'https://smart-lodge-ai-hotel-booking-frontend.vercel.app'
+].filter(Boolean); // Remove undefined values
 
 // Ultra-permissive CORS for Vercel deployment
 app.use((req, res, next) => {
