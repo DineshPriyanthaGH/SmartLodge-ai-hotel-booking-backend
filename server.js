@@ -231,13 +231,153 @@ app.get('/api/hotels', (req, res) => {
   }
 });
 
+// Get individual hotel by ID
+app.get('/api/hotels/:id', (req, res) => {
+  try {
+    console.log(`🏨 Individual hotel endpoint called for ID: ${req.params.id}`);
+    
+    const hotelId = req.params.id;
+    
+    // Mock data - same as above but for individual lookup
+    const mockHotels = [
+      {
+        _id: 'hotel_1',
+        name: 'Grand Luxury Hotel',
+        location: { 
+          city: 'New York', 
+          state: 'NY',
+          country: 'USA',
+          address: '123 Luxury Avenue'
+        },
+        rating: { 
+          overall: 4.8,
+          reviewCount: 256
+        },
+        pricing: { 
+          basePrice: 299,
+          currency: 'USD'
+        },
+        images: [{
+          url: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500',
+          alt: 'Luxury Hotel Exterior'
+        }],
+        amenities: [
+          { name: 'Free WiFi', icon: 'wifi' },
+          { name: 'Swimming Pool', icon: 'pool' },
+          { name: 'Spa & Wellness', icon: 'spa' },
+          { name: 'Restaurant', icon: 'restaurant' },
+          { name: 'Gym', icon: 'fitness' }
+        ],
+        description: 'Experience luxury at its finest in the heart of New York City.',
+        featured: true,
+        status: 'active'
+      },
+      {
+        _id: 'hotel_2',
+        name: 'Cozy Boutique Inn',
+        location: { 
+          city: 'San Francisco', 
+          state: 'CA',
+          country: 'USA',
+          address: '456 Boutique Street'
+        },
+        rating: { 
+          overall: 4.5,
+          reviewCount: 128
+        },
+        pricing: { 
+          basePrice: 189,
+          currency: 'USD'
+        },
+        images: [{
+          url: 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=500',
+          alt: 'Boutique Hotel Room'
+        }],
+        amenities: [
+          { name: 'Free WiFi', icon: 'wifi' },
+          { name: 'Pet Friendly', icon: 'pet' },
+          { name: 'Breakfast', icon: 'breakfast' },
+          { name: 'Business Center', icon: 'business' }
+        ],
+        description: 'A charming boutique experience in the heart of San Francisco.',
+        featured: false,
+        status: 'active'
+      },
+      {
+        _id: 'hotel_3',
+        name: 'Beach Resort Paradise',
+        location: { 
+          city: 'Miami', 
+          state: 'FL',
+          country: 'USA',
+          address: '789 Ocean Drive'
+        },
+        rating: { 
+          overall: 4.9,
+          reviewCount: 412
+        },
+        pricing: { 
+          basePrice: 399,
+          currency: 'USD'
+        },
+        images: [{
+          url: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=500',
+          alt: 'Beach Resort View'
+        }],
+        amenities: [
+          { name: 'Beach Access', icon: 'beach' },
+          { name: 'Multiple Pools', icon: 'pool' },
+          { name: 'Water Sports', icon: 'sports' },
+          { name: 'Spa', icon: 'spa' },
+          { name: 'Fine Dining', icon: 'restaurant' }
+        ],
+        description: 'Tropical paradise with pristine beaches and world-class amenities.',
+        featured: true,
+        status: 'active'
+      }
+    ];
+
+    // Find hotel by ID
+    const hotel = mockHotels.find(h => h._id === hotelId);
+    
+    if (!hotel) {
+      return res.status(404).json({
+        success: false,
+        message: `Hotel with ID '${hotelId}' not found`,
+        availableIds: mockHotels.map(h => h._id)
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Hotel '${hotel.name}' loaded successfully!`,
+      data: {
+        hotel: hotel
+      },
+      metadata: {
+        source: 'emergency-mock-data',
+        timestamp: new Date().toISOString(),
+        hotelId: hotelId
+      }
+    });
+    
+  } catch (error) {
+    console.error('Individual hotel endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'Hotel details endpoint failed, but server is stable'
+    });
+  }
+});
+
 // Catch all API routes
 app.get('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
     message: 'API endpoint not found',
     endpoint: req.path,
-    availableEndpoints: ['/health', '/api/test', '/api/hotels']
+    availableEndpoints: ['/health', '/api/test', '/api/hotels', '/api/hotels/:id']
   });
 });
 
