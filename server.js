@@ -69,55 +69,8 @@ const limiter = rateLimit({
 app.use(limiter);
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    console.log(' CORS check for origin:', origin);
-    
-    
-    if (!origin) {
-      console.log(' No origin - allowing');
-      return callback(null, true);
-    }
-    
-   
-    if (process.env.NODE_ENV === 'production') {
-      if (origin.includes('.vercel.app') || origin.includes('.vercel.com')) {
-        console.log(' Vercel domain allowed:', origin);
-        return callback(null, true);
-      }
-    }
-    
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
-      'https://smart-lodge-ai-hotel-booking-fronte.vercel.app',
-      process.env.FRONTEND_URL
-    ].filter(Boolean);
-    
-    console.log('🎯 Allowed origins:', allowedOrigins);
-    
-    if (allowedOrigins.includes(origin)) {
-      console.log('✅ Origin explicitly allowed:', origin);
-      return callback(null, true);
-    }
-    
-    // For development, allow all localhost origins
-    if (process.env.NODE_ENV === 'development' && origin && origin.includes('localhost')) {
-      console.log('✅ Development localhost allowed:', origin);
-      return callback(null, true);
-    }
-    
-    console.log('CORS: Origin blocked:', origin);
-    // For debugging - temporarily allow all origins in production
-    if (process.env.NODE_ENV === 'production') {
-      console.log(' allowing all origins for debugging');
-      return callback(null, true);
-    }
-    
-    const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-    return callback(new Error(msg), false);
-  },
-  credentials: true,
+  origin: '*', // Allow all origins for now
+  credentials: false, // Must be false when using '*'
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
@@ -170,6 +123,16 @@ app.get('/api/test-cors', (req, res) => {
     success: true,
     message: 'CORS is working!',
     origin: req.headers.origin,
+    timestamp: new Date().toISOString(),
+    headers: req.headers
+  });
+});
+
+// Simple test endpoint to verify server is working
+app.get('/api/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Backend is working!',
     timestamp: new Date().toISOString()
   });
 });
