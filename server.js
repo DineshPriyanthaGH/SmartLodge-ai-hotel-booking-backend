@@ -1587,6 +1587,35 @@ app.get('/admin/dashboard', authenticateAdmin, (req, res) => {
   }
 });
 
+// Catch all admin routes
+app.use('/admin/*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Admin endpoint not found',
+    endpoint: req.path,
+    method: req.method,
+    availableEndpoints: [
+      'POST /admin/login',
+      'GET /admin/dashboard',
+      'GET /admin/hotels',
+      'GET /admin/hotels/:id',
+      'POST /admin/hotels',
+      'PUT /admin/hotels/:id',
+      'DELETE /admin/hotels/:id',
+      'GET /admin/rooms',
+      'GET /admin/rooms/:id',
+      'POST /admin/rooms',
+      'PUT /admin/rooms/:id',
+      'DELETE /admin/rooms/:id',
+      'GET /admin/bookings',
+      'GET /admin/bookings/:id',
+      'POST /admin/bookings',
+      'PUT /admin/bookings/:id',
+      'DELETE /admin/bookings/:id'
+    ]
+  });
+});
+
 // Catch all API routes
 app.get('/api/*', (req, res) => {
   res.status(404).json({
