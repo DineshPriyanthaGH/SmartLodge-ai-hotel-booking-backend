@@ -69,7 +69,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 const corsOptions = {
-  origin: '*', // Allow all origins for now
+  origin: '*', // Allow all origins for production debugging
   credentials: false, // Must be false when using '*'
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
