@@ -412,131 +412,40 @@ app.get('/api/test', (req, res) => {
 // Emergency hotels endpoint with mock data
 app.get('/api/hotels', (req, res) => {
   try {
-    console.log('🏨 Hotels endpoint called');
+    console.log('🏨 Public Hotels endpoint called');
     
-    // Return mock data to verify CORS is working
-    const mockHotels = [
-      {
-        _id: 'hotel_1',
-        name: 'Grand Luxury Hotel',
-        location: { 
-          city: 'New York', 
-          state: 'NY',
-          country: 'USA',
-          address: '123 Luxury Avenue'
-        },
-        rating: { 
-          overall: 4.8,
-          reviewCount: 256
-        },
-        pricing: { 
-          basePrice: 299,
-          currency: 'USD'
-        },
-        images: [{
-          url: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500',
-          alt: 'Luxury Hotel Exterior'
-        }],
-        amenities: [
-          { name: 'Free WiFi', icon: 'wifi' },
-          { name: 'Swimming Pool', icon: 'pool' },
-          { name: 'Spa & Wellness', icon: 'spa' },
-          { name: 'Restaurant', icon: 'restaurant' },
-          { name: 'Gym', icon: 'fitness' }
-        ],
-        description: 'Experience luxury at its finest in the heart of New York City.',
-        featured: true,
-        status: 'active'
-      },
-      {
-        _id: 'hotel_2',
-        name: 'Cozy Boutique Inn',
-        location: { 
-          city: 'San Francisco', 
-          state: 'CA',
-          country: 'USA',
-          address: '456 Boutique Street'
-        },
-        rating: { 
-          overall: 4.5,
-          reviewCount: 128
-        },
-        pricing: { 
-          basePrice: 189,
-          currency: 'USD'
-        },
-        images: [{
-          url: 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=500',
-          alt: 'Boutique Hotel Room'
-        }],
-        amenities: [
-          { name: 'Free WiFi', icon: 'wifi' },
-          { name: 'Pet Friendly', icon: 'pet' },
-          { name: 'Breakfast', icon: 'breakfast' },
-          { name: 'Business Center', icon: 'business' }
-        ],
-        description: 'A charming boutique experience in the heart of San Francisco.',
-        featured: false,
-        status: 'active'
-      },
-      {
-        _id: 'hotel_3',
-        name: 'Beach Resort Paradise',
-        location: { 
-          city: 'Miami', 
-          state: 'FL',
-          country: 'USA',
-          address: '789 Ocean Drive'
-        },
-        rating: { 
-          overall: 4.9,
-          reviewCount: 412
-        },
-        pricing: { 
-          basePrice: 399,
-          currency: 'USD'
-        },
-        images: [{
-          url: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=500',
-          alt: 'Beach Resort View'
-        }],
-        amenities: [
-          { name: 'Beach Access', icon: 'beach' },
-          { name: 'Multiple Pools', icon: 'pool' },
-          { name: 'Water Sports', icon: 'sports' },
-          { name: 'Spa', icon: 'spa' },
-          { name: 'Fine Dining', icon: 'restaurant' }
-        ],
-        description: 'Tropical paradise with pristine beaches and world-class amenities.',
-        featured: true,
-        status: 'active'
-      }
-    ];
+    // Return the same data as admin panel for consistency
+    // This ensures admin changes reflect on the public frontend
+    const hotels = adminData.hotels.map(hotel => ({
+      ...hotel,
+      // Ensure all required fields are present for public API
+      id: hotel._id, // Add both formats for compatibility
+      _id: hotel._id
+    }));
 
     res.status(200).json({
       success: true,
-      message: 'Hotels loaded successfully! CORS is working!',
+      message: 'Hotels loaded successfully! Admin sync enabled!',
       data: {
-        hotels: mockHotels,
+        hotels: hotels,
         pagination: {
           current: 1,
           pages: 1,
-          total: mockHotels.length
+          total: hotels.length
         }
       },
       metadata: {
-        source: 'emergency-mock-data',
+        source: 'admin-data-sync',
         timestamp: new Date().toISOString(),
         cors_status: 'fixed'
       }
     });
     
   } catch (error) {
-    console.error('Hotels endpoint error:', error);
-    res.status(500).json({
+    console.error('Error in public hotels endpoint:', error);
+    res.status(500).json({ 
       success: false,
-      error: error.message,
-      message: 'Hotels endpoint failed, but server is stable'
+      error: 'Failed to fetch hotels' 
     });
   }
 });
@@ -547,114 +456,15 @@ app.get('/api/hotels/:id', (req, res) => {
     console.log(`🏨 Individual hotel endpoint called for ID: ${req.params.id}`);
     
     const hotelId = req.params.id;
-    
-    // Mock data - same as above but for individual lookup
-    const mockHotels = [
-      {
-        _id: 'hotel_1',
-        name: 'Grand Luxury Hotel',
-        location: { 
-          city: 'New York', 
-          state: 'NY',
-          country: 'USA',
-          address: '123 Luxury Avenue'
-        },
-        rating: { 
-          overall: 4.8,
-          reviewCount: 256
-        },
-        pricing: { 
-          basePrice: 299,
-          currency: 'USD'
-        },
-        images: [{
-          url: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500',
-          alt: 'Luxury Hotel Exterior'
-        }],
-        amenities: [
-          { name: 'Free WiFi', icon: 'wifi' },
-          { name: 'Swimming Pool', icon: 'pool' },
-          { name: 'Spa & Wellness', icon: 'spa' },
-          { name: 'Restaurant', icon: 'restaurant' },
-          { name: 'Gym', icon: 'fitness' }
-        ],
-        description: 'Experience luxury at its finest in the heart of New York City.',
-        featured: true,
-        status: 'active'
-      },
-      {
-        _id: 'hotel_2',
-        name: 'Cozy Boutique Inn',
-        location: { 
-          city: 'San Francisco', 
-          state: 'CA',
-          country: 'USA',
-          address: '456 Boutique Street'
-        },
-        rating: { 
-          overall: 4.5,
-          reviewCount: 128
-        },
-        pricing: { 
-          basePrice: 189,
-          currency: 'USD'
-        },
-        images: [{
-          url: 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=500',
-          alt: 'Boutique Hotel Room'
-        }],
-        amenities: [
-          { name: 'Free WiFi', icon: 'wifi' },
-          { name: 'Pet Friendly', icon: 'pet' },
-          { name: 'Breakfast', icon: 'breakfast' },
-          { name: 'Business Center', icon: 'business' }
-        ],
-        description: 'A charming boutique experience in the heart of San Francisco.',
-        featured: false,
-        status: 'active'
-      },
-      {
-        _id: 'hotel_3',
-        name: 'Beach Resort Paradise',
-        location: { 
-          city: 'Miami', 
-          state: 'FL',
-          country: 'USA',
-          address: '789 Ocean Drive'
-        },
-        rating: { 
-          overall: 4.9,
-          reviewCount: 412
-        },
-        pricing: { 
-          basePrice: 399,
-          currency: 'USD'
-        },
-        images: [{
-          url: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=500',
-          alt: 'Beach Resort View'
-        }],
-        amenities: [
-          { name: 'Beach Access', icon: 'beach' },
-          { name: 'Multiple Pools', icon: 'pool' },
-          { name: 'Water Sports', icon: 'sports' },
-          { name: 'Spa', icon: 'spa' },
-          { name: 'Fine Dining', icon: 'restaurant' }
-        ],
-        description: 'Tropical paradise with pristine beaches and world-class amenities.',
-        featured: true,
-        status: 'active'
-      }
-    ];
 
-    // Find hotel by ID
-    const hotel = mockHotels.find(h => h._id === hotelId);
+    // Find hotel by ID from admin data for consistency
+    const hotel = adminData.hotels.find(h => h._id === hotelId);
     
     if (!hotel) {
       return res.status(404).json({
         success: false,
         message: `Hotel with ID '${hotelId}' not found`,
-        availableIds: mockHotels.map(h => h._id)
+        availableIds: adminData.hotels.map(h => h._id)
       });
     }
 
@@ -662,10 +472,13 @@ app.get('/api/hotels/:id', (req, res) => {
       success: true,
       message: `Hotel '${hotel.name}' loaded successfully!`,
       data: {
-        hotel: hotel
+        hotel: {
+          ...hotel,
+          id: hotel._id // Add both formats for compatibility
+        }
       },
       metadata: {
-        source: 'emergency-mock-data',
+        source: 'admin-data-sync',
         timestamp: new Date().toISOString(),
         hotelId: hotelId
       }
@@ -994,11 +807,14 @@ app.get('/admin/rooms', authenticateAdmin, (req, res) => {
       );
     }
     
-    // Add hotel information to each room
+    // Add hotel information to each room and normalize property names
     rooms = rooms.map(room => {
       const hotel = adminData.hotels.find(h => h._id === room.hotelId);
       return {
         ...room,
+        // Normalize property names for frontend compatibility
+        pricePerNight: room.pricing?.basePrice || room.pricePerNight || 0,
+        maxOccupancy: room.capacity?.adults || room.maxOccupancy || 1,
         hotel: hotel ? { _id: hotel._id, name: hotel.name, location: hotel.location } : null
       };
     });
@@ -1042,10 +858,13 @@ app.get('/admin/rooms/:id', authenticateAdmin, (req, res) => {
       });
     }
     
-    // Add hotel information
+    // Add hotel information and normalize property names
     const hotel = adminData.hotels.find(h => h._id === room.hotelId);
     const roomWithHotel = {
       ...room,
+      // Normalize property names for frontend compatibility
+      pricePerNight: room.pricing?.basePrice || room.pricePerNight || 0,
+      maxOccupancy: room.capacity?.adults || room.maxOccupancy || 1,
       hotel: hotel ? { _id: hotel._id, name: hotel.name, location: hotel.location } : null
     };
     
@@ -1262,12 +1081,19 @@ app.get('/admin/bookings', authenticateAdmin, (req, res) => {
       );
     }
     
-    // Add hotel and room information to each booking
+    // Add hotel and room information to each booking and normalize property names
     bookings = bookings.map(booking => {
       const hotel = adminData.hotels.find(h => h._id === booking.hotelId);
       const room = adminData.rooms.find(r => r._id === booking.roomId);
       return {
         ...booking,
+        // Normalize property names for frontend compatibility
+        guestName: booking.guestName || booking.guestInfo?.name || '',
+        guestEmail: booking.guestEmail || booking.guestInfo?.email || '',
+        guestPhone: booking.guestPhone || booking.guestInfo?.phone || '',
+        totalPrice: booking.totalPrice || booking.totalAmount || 0,
+        checkInDate: booking.checkInDate || booking.checkIn || '',
+        checkOutDate: booking.checkOutDate || booking.checkOut || '',
         hotel: hotel ? { _id: hotel._id, name: hotel.name, location: hotel.location } : null,
         room: room ? { _id: room._id, roomNumber: room.roomNumber, type: room.type } : null
       };
@@ -1315,11 +1141,18 @@ app.get('/admin/bookings/:id', authenticateAdmin, (req, res) => {
       });
     }
     
-    // Add hotel and room information
+    // Add hotel and room information and normalize property names
     const hotel = adminData.hotels.find(h => h._id === booking.hotelId);
     const room = adminData.rooms.find(r => r._id === booking.roomId);
     const bookingWithDetails = {
       ...booking,
+      // Normalize property names for frontend compatibility
+      guestName: booking.guestName || booking.guestInfo?.name || '',
+      guestEmail: booking.guestEmail || booking.guestInfo?.email || '',
+      guestPhone: booking.guestPhone || booking.guestInfo?.phone || '',
+      totalPrice: booking.totalPrice || booking.totalAmount || 0,
+      checkInDate: booking.checkInDate || booking.checkIn || '',
+      checkOutDate: booking.checkOutDate || booking.checkOut || '',
       hotel: hotel ? { _id: hotel._id, name: hotel.name, location: hotel.location } : null,
       room: room ? { _id: room._id, roomNumber: room.roomNumber, type: room.type } : null
     };
