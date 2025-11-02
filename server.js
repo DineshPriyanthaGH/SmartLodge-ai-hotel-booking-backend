@@ -409,6 +409,87 @@ app.get('/api/test', (req, res) => {
   }
 });
 
+// ==============================================
+// AI CHATBOT ENDPOINT (Gemini)
+// ==============================================
+
+// Simple proxy to Google Generative Language (Gemini) API
+// SECURITY: Never expose GEMINI_API_KEY to the client. Keep it on the server.
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+
+app.post('/api/chat/ask', async (req, res) => {
+  try {
+    if (!GEMINI_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        message: 'Missing GEMINI_API_KEY on server',
+      });
+    }
+
+    const { message, history = [] } = req.body || {};
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ success: false, message: 'message is required' });
+    }
+
+    // Build contents with minimal conversation history support
+    const contents = [];
+    // include history as alternating user/model messages
+    if (Array.isArray(history)) {
+      history.forEach((m) => {
+        if (!m || !m.role || !m.text) return;
+        const role = m.role === 'model' ? 'model' : 'user';
+        contents.push({ role, parts: [{ text: String(m.text).slice(0, 4000) }] });
+      });
+    }
+    // append latest user message
+    contents.push({ role: 'user', parts: [{ text: message.slice(0, 8000) }] });
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+    const upstream = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ contents }),
+    });
+
+    if (!upstream.ok) {
+      const text = await upstream.text();
+      console.error('Gemini upstream error:', upstream.status, text);
+      return res.status(502).json({ success: false, message: 'Upstream AI error', status: upstream.status, details: text });
+    }
+
+    const data = await upstream.json();
+    // Extract first candidate text
+    const reply = data?.candidates?.[0]?.content?.parts?.map(p => p.text).join('\n').trim();
+    if (!reply) {
+      return res.status(200).json({ success: true, data: { reply: 'Sorry, I could not generate a response.' } });
+    }
+
+    res.json({ success: true, data: { reply } });
+  } catch (error) {
+    console.error('Chat/ask error:', error);
+    res.status(500).json({ success: false, message: 'Chat service failed', error: error.message });
+  }
+});
+
+// Backward-compatible alias: some clients may call /api/chat
+app.post('/api/chat', async (req, res) => {
+  req.url = '/api/chat/ask';
+  return app._router.handle(req, res, () => {});
+});
+
+// Lightweight AI health endpoint (no upstream call)
+app.get('/api/health/ai', (req, res) => {
+  res.json({
+    success: true,
+    hasApiKey: Boolean(GEMINI_API_KEY),
+    model: GEMINI_MODEL,
+  });
+});
+
 // Emergency hotels endpoint with mock data
 app.get('/api/hotels', (req, res) => {
   try {
