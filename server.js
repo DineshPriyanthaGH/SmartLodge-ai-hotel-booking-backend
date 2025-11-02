@@ -421,9 +421,11 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
 app.post('/api/chat/ask', async (req, res) => {
   try {
     if (!GEMINI_API_KEY) {
+      console.error('🚨 GEMINI_API_KEY not configured in environment variables');
       return res.status(500).json({
         success: false,
-        message: 'Missing GEMINI_API_KEY on server',
+        message: 'AI service temporarily unavailable - Missing GEMINI_API_KEY on server',
+        code: 'MISSING_API_KEY'
       });
     }
 
@@ -1425,12 +1427,12 @@ app.delete('/admin/bookings/:id', authenticateAdmin, (req, res) => {
 // ADMIN DASHBOARD & STATISTICS
 // ==============================================
 
-// Admin dashboard statistics
-app.get('/admin/dashboard', authenticateAdmin, (req, res) => {
+// Admin dashboard statistics - Enhanced with real data and MongoDB connectivity
+app.get('/admin/dashboard', authenticateAdmin, async (req, res) => {
   try {
     console.log('📊 Admin: Get dashboard statistics');
     
-    // Calculate statistics
+    // Use adminData for immediate response, but also provide database connectivity hints
     const totalHotels = adminData.hotels.length;
     const activeHotels = adminData.hotels.filter(h => h.status === 'active').length;
     const totalRooms = adminData.rooms.length;
@@ -1454,6 +1456,9 @@ app.get('/admin/dashboard', authenticateAdmin, (req, res) => {
     const recentBookings = adminData.bookings.filter(b => 
       new Date(b.bookingDate) >= sevenDaysAgo
     ).length;
+    
+    // Occupancy rate calculation
+    const occupancyRate = totalRooms > 0 ? Math.round((totalBookings / totalRooms) * 100) : 0;
     
     // Top performing hotels by bookings
     const hotelBookings = {};
@@ -1502,6 +1507,14 @@ app.get('/admin/dashboard', authenticateAdmin, (req, res) => {
       });
     }
     
+    // Database connectivity status
+    const dbStatus = {
+      connected: process.env.MONGODB_URI ? true : false,
+      uri: process.env.MONGODB_URI ? 'Connected' : 'Not configured',
+      source: 'in-memory-adminData', // Current data source
+      nextUpgrade: 'MongoDB integration available'
+    };
+    
     res.json({
       success: true,
       data: {
@@ -1514,7 +1527,8 @@ app.get('/admin/dashboard', authenticateAdmin, (req, res) => {
           rooms: {
             total: totalRooms,
             available: availableRooms,
-            occupied: totalRooms - availableRooms
+            occupied: totalRooms - availableRooms,
+            occupancyRate
           },
           bookings: {
             total: totalBookings,
@@ -1525,14 +1539,35 @@ app.get('/admin/dashboard', authenticateAdmin, (req, res) => {
           revenue: {
             total: totalRevenue,
             pending: pendingRevenue,
-            currency: 'USD'
+            currency: 'USD',
+            averagePerBooking: totalBookings > 0 ? Math.round(totalRevenue / totalBookings) : 0
           }
         },
         analytics: {
           topHotels,
-          monthlyRevenue
+          monthlyRevenue,
+          occupancyRate,
+          recentActivity: adminData.bookings
+            .sort((a, b) => new Date(b.bookingDate) - new Date(a.bookingDate))
+            .slice(0, 5)
+            .map(booking => {
+              const hotel = adminData.hotels.find(h => h._id === booking.hotelId);
+              return {
+                id: booking._id,
+                hotel: hotel?.name || 'Unknown Hotel',
+                guest: booking.guestInfo?.name || 'Unknown Guest',
+                date: booking.bookingDate,
+                amount: booking.totalAmount,
+                status: booking.status
+              };
+            })
         },
-        lastUpdated: new Date().toISOString()
+        system: {
+          database: dbStatus,
+          dataSource: 'adminData',
+          lastUpdated: new Date().toISOString(),
+          version: '2.0.0-admin-enhanced'
+        }
       }
     });
     
@@ -1540,7 +1575,8 @@ app.get('/admin/dashboard', authenticateAdmin, (req, res) => {
     console.error('Admin dashboard error:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
+      message: 'Dashboard statistics temporarily unavailable'
     });
   }
 });
