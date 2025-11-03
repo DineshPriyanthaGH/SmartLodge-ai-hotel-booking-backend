@@ -9,6 +9,25 @@ const { MongoClient } = require('mongodb');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Graceful shutdown handler
+process.on('SIGTERM', async () => {
+  console.log('🛑 SIGTERM received, shutting down gracefully...');
+  if (mongoClient) {
+    await mongoClient.close();
+    console.log('📚 MongoDB connection closed');
+  }
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('🛑 SIGINT received, shutting down gracefully...');
+  if (mongoClient) {
+    await mongoClient.close();
+    console.log('📚 MongoDB connection closed');
+  }
+  process.exit(0);
+});
+
 // MongoDB Connection
 let db = null;
 let mongoClient = null;
@@ -34,8 +53,45 @@ const connectToDatabase = async () => {
   }
 };
 
-// Initialize database connection
-connectToDatabase();
+// Initialize database connection and setup
+const initializeDatabase = async () => {
+  await connectToDatabase();
+  
+  if (db) {
+    // Initialize collections if they don't exist
+    try {
+      const collections = await db.listCollections().toArray();
+      const existingCollections = collections.map(c => c.name);
+      
+      console.log('📋 Existing collections:', existingCollections);
+      
+      // Create collections if they don't exist
+      const requiredCollections = ['hotels', 'rooms', 'bookings', 'users', 'admins', 'reviews'];
+      
+      for (const collectionName of requiredCollections) {
+        if (!existingCollections.includes(collectionName)) {
+          await db.createCollection(collectionName);
+          console.log(`✅ Created collection: ${collectionName}`);
+        }
+      }
+      
+      // Initialize with sample data if hotels collection is empty
+      const hotelsCount = await db.collection('hotels').countDocuments();
+      if (hotelsCount === 0) {
+        console.log('📥 Initializing database with sample data...');
+        await initializeSampleData();
+      } else {
+        console.log(`📊 Found ${hotelsCount} hotels in database`);
+      }
+      
+    } catch (error) {
+      console.error('❌ Database initialization error:', error);
+    }
+  }
+};
+
+// Initialize database and start server
+initializeDatabase();
 
 console.log('🚀 Starting bulletproof server...');
 console.log('Environment:', process.env.NODE_ENV);
@@ -116,6 +172,186 @@ app.use((req, res, next) => {
   console.log(`📝 ${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`);
   next();
 });
+
+// ==============================================
+// DATABASE INITIALIZATION FUNCTIONS
+// ==============================================
+
+// Initialize sample data in MongoDB
+const initializeSampleData = async () => {
+  if (!db) {
+    console.log('⚠️ Database not connected, skipping sample data initialization');
+    return;
+  }
+
+  try {
+    // Sample hotels data
+    const sampleHotels = [
+      {
+        _id: 'hotel_1',
+        name: 'Grand Luxury Hotel',
+        location: { 
+          city: 'New York', 
+          state: 'NY',
+          country: 'USA',
+          address: '123 Luxury Avenue',
+          zipCode: '10001'
+        },
+        rating: { 
+          overall: 4.8,
+          reviewCount: 256
+        },
+        pricing: { 
+          basePrice: 299,
+          currency: 'USD'
+        },
+        images: [{
+          url: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500',
+          alt: 'Luxury Hotel Exterior'
+        }],
+        amenities: [
+          { name: 'Free WiFi', icon: 'wifi' },
+          { name: 'Swimming Pool', icon: 'pool' },
+          { name: 'Spa & Wellness', icon: 'spa' },
+          { name: 'Restaurant', icon: 'restaurant' },
+          { name: 'Gym', icon: 'fitness' }
+        ],
+        description: 'Experience luxury at its finest in the heart of New York City.',
+        featured: true,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        _id: 'hotel_2',
+        name: 'Cozy Boutique Inn',
+        location: { 
+          city: 'San Francisco', 
+          state: 'CA',
+          country: 'USA',
+          address: '456 Boutique Street',
+          zipCode: '94102'
+        },
+        rating: { 
+          overall: 4.5,
+          reviewCount: 128
+        },
+        pricing: { 
+          basePrice: 189,
+          currency: 'USD'
+        },
+        images: [{
+          url: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=500',
+          alt: 'Boutique Hotel'
+        }],
+        amenities: [
+          { name: 'Free WiFi', icon: 'wifi' },
+          { name: 'Pet Friendly', icon: 'pet' },
+          { name: 'Breakfast', icon: 'breakfast' }
+        ],
+        description: 'A charming boutique hotel in the heart of San Francisco.',
+        featured: false,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        _id: 'hotel_3',
+        name: 'Mountain Resort & Spa',
+        location: { 
+          city: 'Denver', 
+          state: 'CO',
+          country: 'USA',
+          address: '789 Mountain View Drive',
+          zipCode: '80202'
+        },
+        rating: { 
+          overall: 4.7,
+          reviewCount: 189
+        },
+        pricing: { 
+          basePrice: 225,
+          currency: 'USD'
+        },
+        images: [{
+          url: 'https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=500',
+          alt: 'Mountain Resort'
+        }],
+        amenities: [
+          { name: 'Free WiFi', icon: 'wifi' },
+          { name: 'Ski Access', icon: 'ski' },
+          { name: 'Spa', icon: 'spa' },
+          { name: 'Restaurant', icon: 'restaurant' }
+        ],
+        description: 'Breathtaking mountain views with world-class amenities.',
+        featured: true,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    // Insert hotels into database
+    await db.collection('hotels').insertMany(sampleHotels);
+    console.log(`✅ Inserted ${sampleHotels.length} sample hotels`);
+
+    // Sample rooms data
+    const sampleRooms = [
+      {
+        _id: 'room_1',
+        hotelId: 'hotel_1',
+        name: 'Deluxe King Suite',
+        type: 'suite',
+        capacity: 2,
+        price: 299,
+        amenities: ['King Bed', 'City View', 'Mini Bar', 'Balcony'],
+        images: ['https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=500'],
+        description: 'Spacious suite with stunning city views.',
+        available: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        _id: 'room_2',
+        hotelId: 'hotel_2',
+        name: 'Cozy Double Room',
+        type: 'standard',
+        capacity: 2,
+        price: 189,
+        amenities: ['Double Bed', 'Free WiFi', 'Coffee Maker'],
+        images: ['https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=500'],
+        description: 'Comfortable room perfect for couples.',
+        available: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    await db.collection('rooms').insertMany(sampleRooms);
+    console.log(`✅ Inserted ${sampleRooms.length} sample rooms`);
+
+    // Create admin user
+    const adminPassword = await bcrypt.hash('admin123', 10);
+    const sampleAdmin = {
+      _id: 'admin_1',
+      username: 'admin',
+      email: 'admin@smartlodge.com',
+      password: adminPassword,
+      role: 'super_admin',
+      permissions: ['hotels', 'rooms', 'bookings', 'users'],
+      createdAt: new Date().toISOString(),
+      lastLogin: null
+    };
+
+    await db.collection('admins').insertOne(sampleAdmin);
+    console.log('✅ Created admin user (username: admin, password: admin123)');
+
+    console.log('🎉 Database initialization completed successfully!');
+
+  } catch (error) {
+    console.error('❌ Error initializing sample data:', error);
+  }
+};
 
 // ==============================================
 // ADMIN AUTHENTICATION & MIDDLEWARE
@@ -522,22 +758,48 @@ app.get('/api/health/ai', (req, res) => {
 });
 
 // Emergency hotels endpoint with mock data
-app.get('/api/hotels', (req, res) => {
+app.get('/api/hotels', async (req, res) => {
   try {
     console.log('🏨 Public Hotels endpoint called');
     
-    // Return the same data as admin panel for consistency
-    // This ensures admin changes reflect on the public frontend
-    const hotels = adminData.hotels.map(hotel => ({
-      ...hotel,
-      // Ensure all required fields are present for public API
-      id: hotel._id, // Add both formats for compatibility
-      _id: hotel._id
-    }));
+    let hotels = [];
+    let source = 'fallback-data';
+    
+    // Try to get hotels from MongoDB first
+    if (db) {
+      try {
+        const hotelDocs = await db.collection('hotels').find({ status: 'active' }).toArray();
+        hotels = hotelDocs.map(hotel => ({
+          ...hotel,
+          // Ensure all required fields are present for public API
+          id: hotel._id, // Add both formats for compatibility
+          _id: hotel._id
+        }));
+        source = 'mongodb-database';
+        console.log(`📊 Loaded ${hotels.length} hotels from MongoDB`);
+      } catch (dbError) {
+        console.error('❌ MongoDB query failed:', dbError);
+        // Fall back to in-memory data
+        hotels = adminData.hotels.map(hotel => ({
+          ...hotel,
+          id: hotel._id,
+          _id: hotel._id
+        }));
+        source = 'fallback-memory';
+      }
+    } else {
+      // Use fallback in-memory data
+      hotels = adminData.hotels.map(hotel => ({
+        ...hotel,
+        id: hotel._id,
+        _id: hotel._id
+      }));
+      source = 'fallback-memory';
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Hotels loaded successfully! Admin sync enabled!',
+      message: 'Hotels loaded successfully! Real database integration active!',
       data: {
         hotels: hotels,
         pagination: {
@@ -547,9 +809,9 @@ app.get('/api/hotels', (req, res) => {
         }
       },
       metadata: {
-        source: 'admin-data-sync',
+        source: source,
         timestamp: new Date().toISOString(),
-        cors_status: 'fixed'
+        database_connected: !!db
       }
     });
     
@@ -925,12 +1187,71 @@ app.post('/admin/login', async (req, res) => {
 // ==============================================
 
 // Get all hotels (Admin)
-app.get('/admin/hotels', authenticateAdmin, (req, res) => {
+app.get('/admin/hotels', authenticateAdmin, async (req, res) => {
   try {
     console.log('🏨 Admin: Get all hotels');
     
     const { page = 1, limit = 10, status, search } = req.query;
-    let hotels = [...adminData.hotels];
+    let hotels = [];
+    let source = 'fallback';
+    
+    // Try MongoDB first
+    if (db) {
+      try {
+        let query = {};
+        
+        // Filter by status
+        if (status) {
+          query.status = status;
+        }
+        
+        // Search functionality
+        if (search) {
+          const searchRegex = new RegExp(search, 'i');
+          query.$or = [
+            { name: searchRegex },
+            { 'location.city': searchRegex },
+            { 'location.state': searchRegex }
+          ];
+        }
+        
+        const totalCount = await db.collection('hotels').countDocuments(query);
+        const hotelDocs = await db.collection('hotels')
+          .find(query)
+          .skip((page - 1) * limit)
+          .limit(parseInt(limit))
+          .toArray();
+        
+        hotels = hotelDocs;
+        source = 'mongodb';
+        console.log(`📊 Admin: Loaded ${hotels.length} hotels from MongoDB`);
+        
+        return res.json({
+          success: true,
+          data: {
+            hotels: hotels,
+            pagination: {
+              current: parseInt(page),
+              pages: Math.ceil(totalCount / limit),
+              total: totalCount,
+              limit: parseInt(limit)
+            }
+          },
+          metadata: {
+            source: source,
+            timestamp: new Date().toISOString()
+          }
+        });
+        
+      } catch (dbError) {
+        console.error('❌ MongoDB admin hotels query failed:', dbError);
+        // Fall back to in-memory data
+      }
+    }
+    
+    // Fallback to in-memory data
+    hotels = [...adminData.hotels];
+    source = 'memory-fallback';
     
     // Filter by status
     if (status) {
@@ -1001,7 +1322,7 @@ app.get('/admin/hotels/:id', authenticateAdmin, (req, res) => {
 });
 
 // Create new hotel (Admin)
-app.post('/admin/hotels', authenticateAdmin, (req, res) => {
+app.post('/admin/hotels', authenticateAdmin, async (req, res) => {
   try {
     console.log('🏨 Admin: Create new hotel');
     
@@ -1042,12 +1363,39 @@ app.post('/admin/hotels', authenticateAdmin, (req, res) => {
       updatedAt: new Date().toISOString()
     };
     
+    // Save to MongoDB first
+    if (db) {
+      try {
+        await db.collection('hotels').insertOne(newHotel);
+        console.log('✅ Hotel saved to MongoDB');
+        
+        res.status(201).json({
+          success: true,
+          message: 'Hotel created successfully in database',
+          data: { hotel: newHotel },
+          metadata: {
+            source: 'mongodb',
+            timestamp: new Date().toISOString()
+          }
+        });
+        return;
+      } catch (dbError) {
+        console.error('❌ Failed to save hotel to MongoDB:', dbError);
+        // Continue to fallback
+      }
+    }
+    
+    // Fallback to in-memory storage
     adminData.hotels.push(newHotel);
     
     res.status(201).json({
       success: true,
-      message: 'Hotel created successfully',
-      data: { hotel: newHotel }
+      message: 'Hotel created successfully (fallback mode)',
+      data: { hotel: newHotel },
+      metadata: {
+        source: 'memory-fallback',
+        timestamp: new Date().toISOString()
+      }
     });
     
   } catch (error) {
@@ -1060,11 +1408,55 @@ app.post('/admin/hotels', authenticateAdmin, (req, res) => {
 });
 
 // Update hotel (Admin)
-app.put('/admin/hotels/:id', authenticateAdmin, (req, res) => {
+app.put('/admin/hotels/:id', authenticateAdmin, async (req, res) => {
   try {
     console.log(`🏨 Admin: Update hotel ${req.params.id}`);
     
-    const hotelIndex = adminData.hotels.findIndex(h => h._id === req.params.id);
+    const hotelId = req.params.id;
+    const updates = req.body;
+    
+    // Try MongoDB first
+    if (db) {
+      try {
+        const currentHotel = await db.collection('hotels').findOne({ _id: hotelId });
+        
+        if (!currentHotel) {
+          return res.status(404).json({
+            success: false,
+            message: 'Hotel not found'
+          });
+        }
+        
+        const updatedHotel = {
+          ...currentHotel,
+          ...updates,
+          _id: currentHotel._id, // Preserve ID
+          createdAt: currentHotel.createdAt, // Preserve creation date
+          updatedAt: new Date().toISOString()
+        };
+        
+        await db.collection('hotels').replaceOne({ _id: hotelId }, updatedHotel);
+        console.log('✅ Hotel updated in MongoDB');
+        
+        res.json({
+          success: true,
+          message: 'Hotel updated successfully in database',
+          data: { hotel: updatedHotel },
+          metadata: {
+            source: 'mongodb',
+            timestamp: new Date().toISOString()
+          }
+        });
+        return;
+        
+      } catch (dbError) {
+        console.error('❌ Failed to update hotel in MongoDB:', dbError);
+        // Continue to fallback
+      }
+    }
+    
+    // Fallback to in-memory storage
+    const hotelIndex = adminData.hotels.findIndex(h => h._id === hotelId);
     
     if (hotelIndex === -1) {
       return res.status(404).json({
@@ -1074,7 +1466,6 @@ app.put('/admin/hotels/:id', authenticateAdmin, (req, res) => {
     }
     
     const currentHotel = adminData.hotels[hotelIndex];
-    const updates = req.body;
     
     // Update hotel data
     adminData.hotels[hotelIndex] = {
@@ -1087,8 +1478,12 @@ app.put('/admin/hotels/:id', authenticateAdmin, (req, res) => {
     
     res.json({
       success: true,
-      message: 'Hotel updated successfully',
-      data: { hotel: adminData.hotels[hotelIndex] }
+      message: 'Hotel updated successfully (fallback mode)',
+      data: { hotel: adminData.hotels[hotelIndex] },
+      metadata: {
+        source: 'memory-fallback',
+        timestamp: new Date().toISOString()
+      }
     });
     
   } catch (error) {
@@ -1943,13 +2338,33 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-const server = app.listen(PORT, () => {
-  console.log(`✅ Emergency server running on port ${PORT}`);
-  console.log(`🌍 Health check: http://localhost:${PORT}/health`);
-  console.log(`🧪 Test CORS: http://localhost:${PORT}/api/test`);
-  console.log(`🏨 Hotels API: http://localhost:${PORT}/api/hotels`);
-});
+// Start server with better error handling
+const startServer = () => {
+  const server = app.listen(PORT, () => {
+    console.log(`✅ Smart Lodge server running on port ${PORT}`);
+    console.log(`🌍 Health check: http://localhost:${PORT}/health`);
+    console.log(`🧪 Test CORS: http://localhost:${PORT}/api/test`);
+    console.log(`🏨 Hotels API: http://localhost:${PORT}/api/hotels`);
+    console.log(`👑 Admin Panel: http://localhost:${PORT}/admin`);
+    console.log(`🛡️ Database Status: ${db ? '✅ Connected' : '⚠️ Fallback Mode'}`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`❌ Port ${PORT} is already in use`);
+      console.log(`🔄 Trying port ${PORT + 1}...`);
+      process.env.PORT = PORT + 1;
+      setTimeout(startServer, 1000);
+    } else {
+      console.error('❌ Server error:', err);
+      process.exit(1);
+    }
+  });
+
+  return server;
+};
+
+const server = startServer();
 
 // Handle server shutdown gracefully
 const gracefulShutdown = async () => {
